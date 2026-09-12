@@ -96,6 +96,11 @@ describe('data-normalizer', () => {
       assert.ok(options.availableFacilities.includes('Pool'));
       assert.ok(options.availableFacilities.includes('Free WiFi'));
       assert.deepEqual(options.availableRatings, [5, 4.5, 4, 3, 'Unrated']);
+      assert.ok(options.availablePriceRanges.length > 0);
+      // Ensure price ranges are sorted from low to high
+      for (let i = 0; i < options.availablePriceRanges.length - 1; i++) {
+        assert.ok(options.availablePriceRanges[i].min <= options.availablePriceRanges[i + 1].min);
+      }
     });
   });
 
@@ -107,10 +112,27 @@ describe('data-normalizer', () => {
     const defaultState: FilterState = {
       maxPrice: null,
       minPrice: null,
+      priceRanges: [],
       facilities: [],
       ratings: [],
       sort: 'recommended',
     };
+
+    it('filters by single price range checkbox', () => {
+      const state: FilterState = { ...defaultState, priceRanges: ['under-1000'] };
+      const filtered = filterAndSortHolidays(holidays, state);
+      assert.equal(filtered.length, 1);
+      assert.equal(filtered[0].hotelName, 'Budget Inn Orlando');
+      assert.equal(filtered[0].pricePerPerson, 799);
+    });
+
+    it('filters by multiple price range checkboxes (OR logic across price ranges)', () => {
+      const state: FilterState = { ...defaultState, priceRanges: ['under-1000', '1500-2000'] };
+      const filtered = filterAndSortHolidays(holidays, state);
+      assert.equal(filtered.length, 2);
+      const prices = filtered.map((h) => h.pricePerPerson).sort((a, b) => a - b);
+      assert.deepEqual(prices, [799, 1705]);
+    });
 
     it('filters by maxPrice per person', () => {
       const state: FilterState = { ...defaultState, maxPrice: 1200 };

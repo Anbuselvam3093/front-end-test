@@ -86,12 +86,17 @@ export default function SearchResultsComponent({
   const filterState: FilterState = useMemo(() => {
     const maxPriceParam = getParam('maxPrice');
     const minPriceParam = getParam('minPrice');
+    const priceRangesParam = getParam('priceRanges');
     const facilitiesParam = getParam('facilities');
     const ratingsParam = getParam('ratings');
     const sortParam = getParam('sort') as SortOption | undefined;
 
     const maxPrice = maxPriceParam ? Number(maxPriceParam) : null;
     const minPrice = minPriceParam ? Number(minPriceParam) : null;
+
+    const priceRanges = priceRangesParam
+      ? priceRangesParam.split(',').filter(Boolean)
+      : [];
 
     const facilities = facilitiesParam
       ? facilitiesParam.split(',').filter(Boolean)
@@ -112,6 +117,7 @@ export default function SearchResultsComponent({
     return {
       maxPrice: maxPrice !== null && !isNaN(maxPrice) ? maxPrice : null,
       minPrice: minPrice !== null && !isNaN(minPrice) ? minPrice : null,
+      priceRanges,
       facilities,
       ratings,
       sort,
@@ -126,6 +132,8 @@ export default function SearchResultsComponent({
         newFilterState.maxPrice !== undefined ? newFilterState.maxPrice : filterState.maxPrice;
       const nextMinPrice =
         newFilterState.minPrice !== undefined ? newFilterState.minPrice : filterState.minPrice;
+      const nextPriceRanges =
+        newFilterState.priceRanges !== undefined ? newFilterState.priceRanges : filterState.priceRanges;
       const nextFacilities =
         newFilterState.facilities !== undefined ? newFilterState.facilities : filterState.facilities;
       const nextRatings =
@@ -143,6 +151,12 @@ export default function SearchResultsComponent({
         params.set('minPrice', String(nextMinPrice));
       } else {
         params.delete('minPrice');
+      }
+
+      if (nextPriceRanges.length > 0) {
+        params.set('priceRanges', nextPriceRanges.join(','));
+      } else {
+        params.delete('priceRanges');
       }
 
       if (nextFacilities.length > 0) {
@@ -172,6 +186,11 @@ export default function SearchResultsComponent({
     updateUrlParams(newState);
   };
 
+  const handleRemovePriceRange = (rangeId: string) => {
+    const updated = filterState.priceRanges.filter((r) => r !== rangeId);
+    updateUrlParams({ priceRanges: updated });
+  };
+
   const handleRemoveFacility = (facility: string) => {
     const updated = filterState.facilities.filter((f) => f !== facility);
     updateUrlParams({ facilities: updated });
@@ -190,6 +209,7 @@ export default function SearchResultsComponent({
     updateUrlParams({
       maxPrice: null,
       minPrice: null,
+      priceRanges: [],
       facilities: [],
       ratings: [],
       sort: 'recommended',
@@ -208,7 +228,9 @@ export default function SearchResultsComponent({
         departureDate={departureDate}
         duration={duration}
         partyFormatted={partyFormatted}
+        filterOptions={filterOptions}
         filterState={filterState}
+        onRemovePriceRange={handleRemovePriceRange}
         onRemoveFacility={handleRemoveFacility}
         onRemoveRating={handleRemoveRating}
         onResetMaxPrice={handleResetMaxPrice}

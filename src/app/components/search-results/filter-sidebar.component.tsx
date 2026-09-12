@@ -20,8 +20,37 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   onResetAll,
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const safePriceRanges = filterState?.priceRanges ?? [];
+  const safeFacilities = filterState?.facilities ?? [];
+  const safeRatings = filterState?.ratings ?? [];
 
   const currentMaxPrice = filterState.maxPrice ?? filterOptions.maxPrice;
+
+  // Calculate counts for each price range across holidays in current search
+  const priceRangeCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const range of filterOptions.availablePriceRanges) {
+      const count = holidays.filter((h) => {
+        if (range.id.startsWith('under-')) {
+          const maxVal = parseFloat(range.id.replace('under-', ''));
+          return h.pricePerPerson < maxVal;
+        }
+        if (range.id.startsWith('over-')) {
+          const minVal = parseFloat(range.id.replace('over-', ''));
+          return h.pricePerPerson >= minVal;
+        }
+        const [minStr, maxStr] = range.id.split('-');
+        const minVal = parseFloat(minStr);
+        const maxVal = parseFloat(maxStr);
+        if (!isNaN(minVal) && !isNaN(maxVal)) {
+          return h.pricePerPerson >= minVal && h.pricePerPerson <= maxVal;
+        }
+        return h.pricePerPerson >= range.min && h.pricePerPerson <= range.max;
+      }).length;
+      counts.set(range.id, count);
+    }
+    return counts;
+  }, [filterOptions.availablePriceRanges, holidays]);
 
   // Calculate counts for each facility across all holidays in current search
   const facilityCounts = React.useMemo(() => {
@@ -44,19 +73,27 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     return counts;
   }, [holidays]);
 
-  const handleFacilityToggle = (facility: string) => {
-    const exists = filterState.facilities.includes(facility);
+  const handlePriceRangeToggle = (rangeId: string) => {
+    const exists = safePriceRanges.includes(rangeId);
     const updated = exists
-      ? filterState.facilities.filter((f) => f !== facility)
-      : [...filterState.facilities, facility];
+      ? safePriceRanges.filter((id) => id !== rangeId)
+      : [...safePriceRanges, rangeId];
+    onFilterChange({ priceRanges: updated });
+  };
+
+  const handleFacilityToggle = (facility: string) => {
+    const exists = safeFacilities.includes(facility);
+    const updated = exists
+      ? safeFacilities.filter((f) => f !== facility)
+      : [...safeFacilities, facility];
     onFilterChange({ facilities: updated });
   };
 
   const handleRatingToggle = (rating: number | 'Unrated') => {
-    const exists = filterState.ratings.includes(rating);
+    const exists = safeRatings.includes(rating);
     const updated = exists
-      ? filterState.ratings.filter((r) => r !== rating)
-      : [...filterState.ratings, rating];
+      ? safeRatings.filter((r) => r !== rating)
+      : [...safeRatings, rating];
     onFilterChange({ ratings: updated });
   };
 
@@ -70,8 +107,9 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
 
   const hasActiveFilters =
     filterState.maxPrice !== null ||
-    filterState.facilities.length > 0 ||
-    filterState.ratings.length > 0;
+    safePriceRanges.length > 0 ||
+    safeFacilities.length > 0 ||
+    safeRatings.length > 0;
 
   return (
     <>
@@ -102,12 +140,34 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
           )}
         </div>
 
-        {/* Price Filter */}
+        {/* Dynamic Price per Person Checkbox Filter (Low to High) */}
         <fieldset className={styles.filterGroup}>
           <legend className={styles.filterLegend}>Price per person</legend>
-          <div className={styles.priceControl}>
+          {filterOptions.availablePriceRanges.length > 0 && (
+            <div className={styles.checkboxList}>
+              {filterOptions.availablePriceRanges.map((range) => {
+                const isChecked = safePriceRanges.includes(range.id);
+                const count = priceRangeCounts.get(range.id) || 0;
+
+                return (
+                  <label key={`price-range-${range.id}`} className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handlePriceRangeToggle(range.id)}
+                      className={styles.checkboxInput}
+                    />
+                    <span>{range.label}</span>
+                    <span className={styles.countBadge}>({count})</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+
+          {/* <div className={styles.priceControl} style={{ marginTop: '0.8rem' }}>
             <div className={styles.priceDisplay}>
-              Up to £{currentMaxPrice.toLocaleString()} pp
+              Max: £{currentMaxPrice.toLocaleString()} pp
             </div>
             <input
               type="range"
@@ -119,37 +179,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               className={styles.rangeInput}
               aria-label="Maximum price per person"
             />
-            <div className={styles.presetButtons}>
-              <button
-                type="button"
-                className={`${styles.presetBtn} ${filterState.maxPrice === 1000 ? styles.presetBtnActive : ''}`}
-                onClick={() => handleMaxPriceChange(1000)}
-              >
-                Under £1k
-              </button>
-              <button
-                type="button"
-                className={`${styles.presetBtn} ${filterState.maxPrice === 1500 ? styles.presetBtnActive : ''}`}
-                onClick={() => handleMaxPriceChange(1500)}
-              >
-                Under £1.5k
-              </button>
-              <button
-                type="button"
-                className={`${styles.presetBtn} ${filterState.maxPrice === 2000 ? styles.presetBtnActive : ''}`}
-                onClick={() => handleMaxPriceChange(2000)}
-              >
-                Under £2k
-              </button>
-              <button
-                type="button"
-                className={`${styles.presetBtn} ${filterState.maxPrice === null ? styles.presetBtnActive : ''}`}
-                onClick={() => onFilterChange({ maxPrice: null })}
-              >
-                Any
-              </button>
-            </div>
-          </div>
+          </div> */}
         </fieldset>
 
         {/* Rating Filter */}
@@ -158,7 +188,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             <legend className={styles.filterLegend}>Star / Rating</legend>
             <div className={styles.checkboxList}>
               {filterOptions.availableRatings.map((rating) => {
-                const isChecked = filterState.ratings.includes(rating);
+                const isChecked = safeRatings.includes(rating);
                 const count = ratingCounts.get(rating) || 0;
                 const label = rating === 'Unrated' ? 'Unrated' : `${rating} Stars`;
 
@@ -185,7 +215,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
             <legend className={styles.filterLegend}>Hotel Facilities</legend>
             <div className={styles.checkboxList}>
               {filterOptions.availableFacilities.map((fac) => {
-                const isChecked = filterState.facilities.includes(fac);
+                const isChecked = safeFacilities.includes(fac);
                 const count = facilityCounts.get(fac) || 0;
 
                 return (

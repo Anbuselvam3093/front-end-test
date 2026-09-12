@@ -28,9 +28,17 @@ export interface NormalizedHoliday {
   propertyType: string;
 }
 
+export interface PriceRangeOption {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+}
+
 export interface FilterOptions {
   minPrice: number;
   maxPrice: number;
+  availablePriceRanges: PriceRangeOption[];
   availableFacilities: string[];
   availableRatings: Array<number | 'Unrated'>;
 }
@@ -40,6 +48,7 @@ export type SortOption = 'recommended' | 'price-asc' | 'rating-desc';
 export interface FilterState {
   maxPrice: number | null;
   minPrice: number | null;
+  priceRanges: string[];
   facilities: string[];
   ratings: Array<number | 'Unrated'>;
   sort: SortOption;
@@ -137,11 +146,70 @@ export function normalizeHoliday(holiday: Holiday, index: number): NormalizedHol
   };
 }
 
+export function generatePriceRanges(holidays: NormalizedHoliday[]): PriceRangeOption[] {
+  const prices = holidays
+    .map((h) => h.pricePerPerson)
+    .filter((p) => typeof p === 'number' && !isNaN(p) && isFinite(p))
+    .sort((a, b) => a - b);
+
+  if (prices.length === 0) return [];
+
+  const min = prices[0];
+  const max = prices[prices.length - 1];
+
+  let step = 500;
+  const span = max - min;
+  if (span <= 200) step = 50;
+  else if (span <= 500) step = 100;
+  else if (span <= 1200) step = 250;
+  else if (span <= 3000) step = 500;
+  else step = 1000;
+
+  const minBucket = Math.floor(min / step) * step;
+  const maxBucket = Math.floor(max / step) * step;
+
+  const ranges: PriceRangeOption[] = [];
+
+  const firstThreshold = minBucket === 0 ? step : minBucket + step;
+  ranges.push({
+    id: `under-${firstThreshold}`,
+    label: `Under £${firstThreshold.toLocaleString()}`,
+    min: 0,
+    max: firstThreshold - 0.01,
+  });
+
+  let current = firstThreshold;
+  while (current < maxBucket) {
+    const next = current + step;
+    ranges.push({
+      id: `${current}-${next}`,
+      label: `£${current.toLocaleString()} - £${next.toLocaleString()}`,
+      min: current,
+      max: next - 0.01,
+    });
+    current = next;
+  }
+
+  if (current <= maxBucket) {
+    ranges.push({
+      id: `over-${current}`,
+      label: `£${current.toLocaleString()}+`,
+      min: current,
+      max: Infinity,
+    });
+  }
+
+  return ranges
+    .filter((r) => holidays.some((h) => h.pricePerPerson >= r.min && h.pricePerPerson <= r.max))
+    .sort((a, b) => a.min - b.min);
+}
+
 export function deriveFilterOptions(holidays: NormalizedHoliday[]): FilterOptions {
   if (holidays.length === 0) {
     return {
       minPrice: 0,
       maxPrice: 5000,
+      availablePriceRanges: [],
       availableFacilities: [],
       availableRatings: [],
     };
@@ -175,9 +243,12 @@ export function deriveFilterOptions(holidays: NormalizedHoliday[]): FilterOption
     return (b as number) - (a as number);
   });
 
+  const availablePriceRanges = generatePriceRanges(holidays);
+
   return {
     minPrice: isFinite(minPrice) ? minPrice : 0,
     maxPrice: isFinite(maxPrice) ? maxPrice : 5000,
+    availablePriceRanges,
     availableFacilities,
     availableRatings,
   };
@@ -188,6 +259,29 @@ export function filterAndSortHolidays(
   filterState: FilterState
 ): NormalizedHoliday[] {
   let results = holidays.filter((h) => {
+    // 1. Price Ranges Checkbox Filter (OR logic across selected price ranges)
+    if (filterState.priceRanges && filterState.priceRanges.length > 0) {
+      const inAnyRange = filterState.priceRanges.some((rangeId) => {
+        if (rangeId.startsWith('under-')) {
+          const maxVal = parseFloat(rangeId.replace('under-', ''));
+          return h.pricePerPerson < maxVal;
+        }
+        if (rangeId.startsWith('over-')) {
+          const minVal = parseFloat(rangeId.replace('over-', ''));
+          return h.pricePerPerson >= minVal;
+        }
+        const [minStr, maxStr] = rangeId.split('-');
+        const minVal = parseFloat(minStr);
+        const maxVal = parseFloat(maxStr);
+        if (!isNaN(minVal) && !isNaN(maxVal)) {
+          return h.pricePerPerson >= minVal && h.pricePerPerson <= maxVal;
+        }
+        return true;
+      });
+      if (!inAnyRange) return false;
+    }
+
+    // 2. Max/Min Price Slider / Query Filters
     if (filterState.maxPrice !== null && h.pricePerPerson > filterState.maxPrice) {
       return false;
     }
@@ -195,6 +289,7 @@ export function filterAndSortHolidays(
       return false;
     }
 
+    // 3. Facilities Filter (AND logic)
     if (filterState.facilities.length > 0) {
       const holidayFacilitiesLower = new Set(h.facilities.map((f) => f.toLowerCase()));
       const matchesAllFacilities = filterState.facilities.every((req) =>
@@ -203,6 +298,7 @@ export function filterAndSortHolidays(
       if (!matchesAllFacilities) return false;
     }
 
+    // 4. Star Rating Filter (OR logic among selected ratings)
     if (filterState.ratings.length > 0) {
       const match = filterState.ratings.some((selectedRating) => {
         if (selectedRating === 'Unrated') {

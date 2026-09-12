@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { FilterState } from '@/utils/data-normalizer';
+import type { FilterOptions, FilterState } from '@/utils/data-normalizer';
 import styles from './search-results.module.css';
 
 interface SearchSummaryProps {
@@ -10,7 +10,9 @@ interface SearchSummaryProps {
   departureDate?: string;
   duration?: string;
   partyFormatted?: string;
+  filterOptions: FilterOptions;
   filterState: FilterState;
+  onRemovePriceRange: (rangeId: string) => void;
   onRemoveFacility: (facility: string) => void;
   onRemoveRating: (rating: number | 'Unrated') => void;
   onResetMaxPrice: () => void;
@@ -23,16 +25,23 @@ export const SearchSummary: React.FC<SearchSummaryProps> = ({
   departureDate,
   duration = '7',
   partyFormatted = '2 people / 1 room',
+  filterOptions,
   filterState,
+  onRemovePriceRange,
   onRemoveFacility,
   onRemoveRating,
   onResetMaxPrice,
   onResetAll,
 }) => {
+  const safePriceRanges = filterState?.priceRanges ?? [];
+  const safeFacilities = filterState?.facilities ?? [];
+  const safeRatings = filterState?.ratings ?? [];
+
   const hasActiveFilters =
     filterState.maxPrice !== null ||
-    filterState.facilities.length > 0 ||
-    filterState.ratings.length > 0;
+    safePriceRanges.length > 0 ||
+    safeFacilities.length > 0 ||
+    safeRatings.length > 0;
 
   const displayLocation = location
     ? location.charAt(0).toUpperCase() + location.slice(1).replace('-', ' ')
@@ -55,6 +64,25 @@ export const SearchSummary: React.FC<SearchSummaryProps> = ({
         <div className={styles.activeFiltersBar}>
           <span className={styles.activeFiltersLabel}>Active Filters:</span>
 
+          {safePriceRanges.map((rangeId) => {
+            const rangeObj = filterOptions.availablePriceRanges.find((r) => r.id === rangeId);
+            const label = rangeObj ? rangeObj.label : rangeId;
+
+            return (
+              <span key={`price-badge-${rangeId}`} className={styles.filterBadge}>
+                {label} pp
+                <button
+                  type="button"
+                  className={styles.filterBadgeRemove}
+                  onClick={() => onRemovePriceRange(rangeId)}
+                  aria-label={`Remove ${label} price filter`}
+                >
+                  ✕
+                </button>
+              </span>
+            );
+          })}
+
           {filterState.maxPrice !== null && (
             <span className={styles.filterBadge}>
               Up to £{filterState.maxPrice} pp
@@ -69,7 +97,7 @@ export const SearchSummary: React.FC<SearchSummaryProps> = ({
             </span>
           )}
 
-          {filterState.ratings.map((rating) => (
+          {safeRatings.map((rating) => (
             <span key={`rating-${rating}`} className={styles.filterBadge}>
               {rating === 'Unrated' ? 'Unrated' : `${rating} ★`}
               <button
@@ -83,7 +111,7 @@ export const SearchSummary: React.FC<SearchSummaryProps> = ({
             </span>
           ))}
 
-          {filterState.facilities.map((fac) => (
+          {safeFacilities.map((fac) => (
             <span key={`fac-${fac}`} className={styles.filterBadge}>
               {fac}
               <button
