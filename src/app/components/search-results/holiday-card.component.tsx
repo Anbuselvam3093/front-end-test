@@ -16,6 +16,8 @@ export const HolidayCard: React.FC<HolidayCardProps> = ({
   durationNights = '7',
   partyFormatted = '2 people / 1 room',
 }) => {
+  const [hasImageError, setHasImageError] = React.useState(false);
+
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
@@ -37,7 +39,7 @@ export const HolidayCard: React.FC<HolidayCardProps> = ({
   return (
     <article className={styles.card} data-testid="holiday-card">
       <div className={styles.cardImageWrapper}>
-        {holiday.imageUrl ? (
+        {holiday.imageUrl && !hasImageError ? (
           <Image
             src={holiday.imageUrl}
             alt={holiday.hotelName}
@@ -45,6 +47,7 @@ export const HolidayCard: React.FC<HolidayCardProps> = ({
             sizes="(max-width: 680px) 100vw, 280px"
             className={styles.cardImage}
             unoptimized
+            onError={() => setHasImageError(true)}
           />
         ) : (
           <div className={styles.placeholderImage}>
@@ -65,7 +68,8 @@ export const HolidayCard: React.FC<HolidayCardProps> = ({
               <path d="M16 11v4" />
               <path d="M8 11v4" />
             </svg>
-            <span>No Image Available</span>
+            <span>Photo unavailable</span>
+            <small className={styles.placeholderSubtext}>Image couldn&apos;t be loaded.</small>
           </div>
         )}
       </div>
