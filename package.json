@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/utils/data-normalizer.test.ts src/utils/search-params.test.ts",
+  "test": "node --import tsx --import ./src/test-setup.ts --test src/utils/data-normalizer.test.ts src/utils/search-params.test.ts src/app/components/search-results/search-results-components.test.tsx src/app/components/search-results/search-summary.component.test.tsx src/app/components/search-results/holiday-card.component.test.tsx",
     "start": "next start",
     "lint": "eslint ."
   },
@@ -23,8 +23,11 @@
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.10",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/jest": "^30.0.0",
     "@types/luxon": "^3.7.1",
-    "@types/node": "^22.20.1",
+    "@types/node": "^22.20.2",
     "@types/parsimmon": "^1.10.9",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -32,6 +35,7 @@
     "eslint-config-next": "16.2.10",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",
+    "vite": "^8.3.0",
     "vitest": "^5.0.0"
   }
 }

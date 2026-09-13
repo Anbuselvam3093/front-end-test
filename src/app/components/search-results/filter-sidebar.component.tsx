@@ -24,8 +24,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
   const safeFacilities = filterState?.facilities ?? [];
   const safeRatings = filterState?.ratings ?? [];
 
-  const currentMaxPrice = filterState.maxPrice ?? filterOptions.maxPrice;
-
   // Calculate counts for each price range across holidays in current search
   const priceRangeCounts = React.useMemo(() => {
     const counts = new Map<string, number>();
@@ -97,14 +95,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
     onFilterChange({ ratings: updated });
   };
 
-  const handleMaxPriceChange = (value: number) => {
-    if (value >= filterOptions.maxPrice) {
-      onFilterChange({ maxPrice: null });
-    } else {
-      onFilterChange({ maxPrice: value });
-    }
-  };
-
   const hasActiveFilters =
     filterState.maxPrice !== null ||
     safePriceRanges.length > 0 ||
@@ -164,22 +154,6 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
               })}
             </div>
           )}
-
-          {/* <div className={styles.priceControl} style={{ marginTop: '0.8rem' }}>
-            <div className={styles.priceDisplay}>
-              Max: £{currentMaxPrice.toLocaleString()} pp
-            </div>
-            <input
-              type="range"
-              min={filterOptions.minPrice}
-              max={filterOptions.maxPrice}
-              step={50}
-              value={currentMaxPrice}
-              onChange={(e) => handleMaxPriceChange(Number(e.target.value))}
-              className={styles.rangeInput}
-              aria-label="Maximum price per person"
-            />
-          </div> */}
         </fieldset>
 
         {/* Rating Filter */}
